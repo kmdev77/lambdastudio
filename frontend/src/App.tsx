@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import Logo from "./assets/lambdastudiolg.png"
 
 const MAX_PX = 4096;
 type Fit = "contain" | "cover" | "fill" | "inside" | "outside";
@@ -34,10 +35,10 @@ export default function App() {
       const f = e.dataTransfer?.files?.[0];
       if (f) handleFile(f);
     };
-    ["dragenter","dragover","dragleave","drop"].forEach(evt => el.addEventListener(evt, prevent as any));
+    ["dragenter", "dragover", "dragleave", "drop"].forEach(evt => el.addEventListener(evt, prevent as any));
     el.addEventListener("drop", onDrop as any);
     return () => {
-      ["dragenter","dragover","dragleave","drop"].forEach(evt => el.removeEventListener(evt, prevent as any));
+      ["dragenter", "dragover", "dragleave", "drop"].forEach(evt => el.removeEventListener(evt, prevent as any));
       el.removeEventListener("drop", onDrop as any);
     };
   }, []);
@@ -127,89 +128,145 @@ export default function App() {
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-black text-zinc-800 dark:text-zinc-100 flex flex-col">
       <header className="sticky top-0 backdrop-blur-lg bg-white/70 dark:bg-zinc-950/60 border-b border-zinc-200/60 dark:border-zinc-800/60">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Image Resizer <span className="text-zinc-400">·</span> <span className="text-emerald-500">AI</span>
-          </h1>
-          <span className="text-xs text-zinc-500">Bucket: {bucketLabel || "(auto-managed)"}</span>
+          {/* Brand section */}
+          <div className="flex items-center gap-1 sm:gap-1">
+            <img
+              src={Logo}// <-- replace with your actual logo path
+              alt="LambdaStudio logo"
+              className="h-8 w-8 sm:h-10 sm:w-10 object-contain"
+            />
+            <h1 className="text-2xl font-semibold tracking-tight flex items-baseline">
+              <span className="bg-gradient-to-r from-emerald-500 to-sky-500 bg-clip-text text-transparent">
+                Lambda
+              </span>
+              <span className="text-zinc-900 dark:text-zinc-100">Studio</span>
+            </h1>
+          </div>
+
+          {/* Bucket label */}
+          {/* <span className="text-xs text-zinc-500">
+            Bucket: {bucketLabel || "(auto-managed)"}
+          </span> */}
         </div>
       </header>
-
       <main className="max-w-6xl w-full mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8">
         {/* Upload and controls */}
-        <section className="flex-1 space-y-6">
-          {/* Upload */}
-          <div ref={dropRef} className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur p-6 transition hover:border-emerald-500/40">
-            <p className="font-medium mb-2 text-sm">Upload Image</p>
-            <label htmlFor="file" className="block cursor-pointer text-center border border-dashed rounded-xl p-6 hover:bg-zinc-100/40 dark:hover:bg-zinc-800/50 transition">
-              <input type="file" id="file" accept="image/*" className="hidden" onChange={e=>{const f=e.target.files?.[0]; if(f) handleFile(f);}}/>
-              <div className="text-sm text-zinc-500">Drag & drop or <span className="underline">browse</span></div>
-              {file && <div className="mt-2 text-xs text-zinc-400">{file.name} · {(file.size/1024/1024).toFixed(2)} MB</div>}
-              {imgMeta && <div className="mt-1 text-xs text-zinc-400">Original: {imgMeta.w} × {imgMeta.h}px</div>}
-            </label>
-            {uploading && <div className="mt-3 text-xs text-amber-600">Uploading…</div>}
-          </div>
+     <section className="flex-1 space-y-6">
+  {/* Upload */}
+  <div
+    ref={dropRef}
+    className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur p-6 transition hover:border-emerald-500/40"
+  >
+    <p className="font-medium mb-2 text-sm">Upload Image</p>
+    <label
+      htmlFor="file"
+      className="block cursor-pointer text-center border border-dashed rounded-xl p-6 hover:bg-zinc-100/40 dark:hover:bg-zinc-800/50 transition"
+    >
+      <input
+        type="file"
+        id="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+        }}
+      />
+      <div className="text-sm text-zinc-500">
+        Drag & drop or <span className="underline">browse</span>
+      </div>
+      {file && (
+        <div className="mt-2 text-xs text-zinc-400">
+          {file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB
+        </div>
+      )}
+      {imgMeta && (
+        <div className="mt-1 text-xs text-zinc-400">
+          Original: {imgMeta.w} × {imgMeta.h}px
+        </div>
+      )}
+    </label>
+    {uploading && <div className="mt-3 text-xs text-amber-600">Uploading…</div>}
+  </div>
 
-          {/* Dimensions */}
-          <div className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur p-6">
-            <p className="font-medium mb-4 text-sm">Resize Options</p>
-            <div className="flex flex-col sm:flex-row gap-3 items-end">
-              <div className="flex-1">
-                <label className="text-xs text-zinc-500">Width (px)</label>
-                <input type="number" value={dims?.w||""} onChange={e=>onWidth(Number(e.target.value))} className="mt-1 w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent"/>
-              </div>
-              <button
-                type="button"
-                onClick={()=>dims&&setDims({...dims,lock:!dims.lock})}
-                className={`h-10 w-10 rounded-lg flex items-center justify-center border ${dims?.lock?"border-emerald-500 text-emerald-500":"border-zinc-400 text-zinc-400"} transition`}
-              >
-                {dims?.lock ? "🔒" : "🔓"}
-              </button>
-              <div className="flex-1">
-                <label className="text-xs text-zinc-500">Height (px)</label>
-                <input type="number" value={dims?.h||""} onChange={e=>onHeight(Number(e.target.value))} className="mt-1 w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent"/>
-              </div>
-            </div>
-{/* 
-            <div className="mt-5 flex items-center justify-between">
-              <span className="text-xs text-zinc-500">Remove BG</span>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" checked={removeBg} onChange={e=>setRemoveBg(e.target.checked)} className="sr-only peer"/>
-                <span className="w-11 h-6 bg-zinc-300 peer-checked:bg-emerald-500 rounded-full relative after:content-[''] after:w-5 after:h-5 after:bg-white after:rounded-full after:absolute after:top-[2px] after:left-[2px] after:transition-transform peer-checked:after:translate-x-5"></span>
-              </label>
-            </div> */}
+  {/* Dimensions */}
+  <div className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur p-6">
+    <p className="font-medium mb-4 text-sm">Resize Options</p>
 
-            {/* Process button */}
-            <button
-              onClick={onProcess}
-              disabled={!key || processing}
-              className="mt-6 relative w-full h-12 rounded-xl bg-black text-white dark:bg-white dark:text-black disabled:opacity-50 overflow-hidden group"
-            >
-              <span className="relative z-10">{processing ? "Processing…" : "Resize Image"}</span>
-              <span className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity blur-lg"></span>
-            </button>
+    {/* Make inputs match button width and center on mobile */}
+    <div className="w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 items-end">
+        {/* Width */}
+        <div className="w-full">
+          <label className="text-xs text-zinc-500">Width (px)</label>
+          <input
+            type="number"
+            value={dims?.w || ""}
+            onChange={(e) => onWidth(Number(e.target.value))}
+            className="mt-1 w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent"
+          />
+        </div>
 
-            {/* Palette button (rainbow animated border) */}
-            <div className="mt-4 relative">
-              <div className="absolute inset-0 rounded-xl p-[2px] animate-[borderSpin_3s_linear_infinite] bg-[conic-gradient(from_0deg,red,orange,yellow,green,cyan,blue,purple,red)]">
-                <div className="h-full w-full bg-white dark:bg-zinc-900 rounded-[10px]"></div>
-              </div>
-              <button
-                onClick={onPalette}
-                disabled={!key || uploading}
-                className="relative z-10 w-full h-12 font-medium text-lg rounded-xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur hover:scale-[1.01] active:scale-[0.99] transition-transform"
-              >
-                Get Palette 🎨
-              </button>
-            </div>
+        {/* Lock centered */}
+        <button
+          type="button"
+          onClick={() => dims && setDims({ ...dims, lock: !dims.lock })}
+          className={`mx-auto h-11 w-11 rounded-lg flex items-center justify-center border transition
+            ${dims?.lock ? "border-emerald-500 text-emerald-500" : "border-zinc-400 text-zinc-400"}`}
+          title={dims?.lock ? "Unlock aspect ratio" : "Lock aspect ratio"}
+        >
+          {dims?.lock ? "🔒" : "🔓"}
+        </button>
 
-            {note && <p className="mt-3 text-xs text-zinc-500">{note}</p>}
-          </div>
-        </section>
+        {/* Height */}
+        <div className="w-full">
+          <label className="text-xs text-zinc-500">Height (px)</label>
+          <input
+            type="number"
+            value={dims?.h || ""}
+            onChange={(e) => onHeight(Number(e.target.value))}
+            className="mt-1 w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent"
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* Process button */}
+    <button
+      onClick={onProcess}
+      disabled={!key || processing}
+      className="mt-6 relative w-full h-12 rounded-xl bg-black text-white dark:bg-white dark:text-black disabled:opacity-50 overflow-hidden group"
+    >
+      <span className="relative z-10">
+        {processing ? "Processing…" : "Resize Image"}
+      </span>
+      <span className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity blur-lg"></span>
+    </button>
+
+    {/* Palette button (rainbow animated border) */}
+    <div className="mt-4 relative">
+      <div className="absolute inset-0 rounded-xl p-[2px] animate-[borderSpin_3s_linear_infinite] bg-[conic-gradient(from_0deg,red,orange,yellow,green,cyan,blue,purple,red)]">
+        <div className="h-full w-full bg-white dark:bg-zinc-900 rounded-[10px]"></div>
+      </div>
+      <button
+        onClick={onPalette}
+        disabled={!key || uploading}
+        className="relative z-10 w-full h-12 font-medium text-lg rounded-xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur hover:scale-[1.01] active:scale-[0.99] transition-transform"
+      >
+        Get Palette 🎨
+      </button>
+    </div>
+
+    {note && <p className="mt-3 text-xs text-zinc-500">{note}</p>}
+  </div>
+</section>
 
         {/* Preview */}
         <section className="flex-1 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur p-6">
           <p className="font-medium mb-4 text-sm">Preview</p>
-          <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 aspect-square flex items-center justify-center bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAK0lEQVQoU2NkYGD4z0AEYBxVSFUwCqjZKFYBjNolYo1A1CBRwFqDKAAAjDgw4ihA0hYAAAAASUVORK5CYII=')]">
+                    {/* <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 aspect-square flex items-center justify-center bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAK0lEQVQoU2NkYGD4z0AEYBxVSFUwCqjZKFYBjNolYo1A1CBRwFqDKAAAjDgw4ihA0hYAAAAASUVORK5CYII=')]"> */}
+
+          <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 aspect-square flex items-center justify-center">
             {previewUrl ? (
               <img src={previewUrl} alt="Preview" className="max-h-full max-w-full object-contain" />
             ) : (
@@ -222,9 +279,9 @@ export default function App() {
             <div className="mt-6">
               <p className="font-medium mb-2 text-sm">Extracted Palette</p>
               <div className="flex gap-2 overflow-x-auto pb-2">
-                {palette.map((hex,i)=>(
-                  <div key={i} className="flex-shrink-0 w-12 h-12 rounded-lg border border-zinc-300 dark:border-zinc-700 flex items-center justify-center font-mono text-[10px]" style={{backgroundColor:hex}}>
-                    <span className={parseInt(hex.replace("#",""),16)>0xffffff/2?"text-black":"text-white"}>{hex}</span>
+                {palette.map((hex, i) => (
+                  <div key={i} className="flex-shrink-0 w-12 h-12 rounded-lg border border-zinc-300 dark:border-zinc-700 flex items-center justify-center font-mono text-[10px]" style={{ backgroundColor: hex }}>
+                    <span className={parseInt(hex.replace("#", ""), 16) > 0xffffff / 2 ? "text-black" : "text-white"}>{hex}</span>
                   </div>
                 ))}
               </div>
