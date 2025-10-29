@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import Logo from "./assets/lambdastudiolg.png"
+import Logo from "./assets/lambdastudiolg.png";
+import LambHex from "./assets/lamb-hex.png";
 
 const MAX_PX = 4096;
 type Fit = "contain" | "cover" | "fill" | "inside" | "outside";
 
 export default function App() {
   const apiUrl = import.meta.env.VITE_API_URL as string;
-  const bucketEnv = import.meta.env.VITE_S3_BUCKET as string || "";
+  const bucketEnv = (import.meta.env.VITE_S3_BUCKET as string) || "";
 
   const [file, setFile] = useState<File | null>(null);
   const [key, setKey] = useState<string | null>(null);
@@ -48,10 +49,16 @@ export default function App() {
     setPreviewUrl(null);
     setPalette(null);
     setNote("Preparing upload…");
+
     const dataUrl = await fileToDataUrl(f);
-    const { width, height } = await getImgSize(dataUrl);
+    const { width, height } = await getImgSize(dataUrl); // ✅ removed stray label
+
+    // Instant preview on upload
+    setPreviewUrl(dataUrl);
+
     setImgMeta({ w: width, h: height });
     setDims({ w: width, h: height, fit: "contain", lock: true });
+
     await signAndUpload(f);
   }
 
@@ -124,147 +131,259 @@ export default function App() {
   const onWidth = (n: number) => dims && setDims(dims.lock ? { ...dims, w: clamp(n), h: clamp(n / ratio) } : { ...dims, w: clamp(n) });
   const onHeight = (n: number) => dims && setDims(dims.lock ? { ...dims, h: clamp(n), w: clamp(n * ratio) } : { ...dims, h: clamp(n) });
 
+  function scrollToInstructions() {
+  const nodes = Array.from(document.querySelectorAll('[data-hiw="true"]')) as HTMLElement[];
+  const target = nodes.find(n => getComputedStyle(n).display !== "none") || nodes[0];
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-black text-zinc-800 dark:text-zinc-100 flex flex-col">
-      <header className="sticky top-0 backdrop-blur-lg bg-white/70 dark:bg-zinc-950/60 border-b border-zinc-200/60 dark:border-zinc-800/60">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          {/* Brand section */}
-          <div className="flex items-center gap-1 sm:gap-1">
-            <img
-              src={Logo}// <-- replace with your actual logo path
-              alt="LambdaStudio logo"
-              className="h-8 w-8 sm:h-10 sm:w-10 object-contain"
-            />
-            <h1 className="text-2xl font-semibold tracking-tight flex items-baseline">
-              <span className="bg-gradient-to-r from-emerald-500 to-sky-500 bg-clip-text text-transparent">
-                Lambda
-              </span>
-              <span className="text-zinc-900 dark:text-zinc-100">Studio</span>
-            </h1>
-          </div>
-
-          {/* Bucket label */}
-          {/* <span className="text-xs text-zinc-500">
-            Bucket: {bucketLabel || "(auto-managed)"}
-          </span> */}
-        </div>
-      </header>
-      <main className="max-w-6xl w-full mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8">
-        {/* Upload and controls */}
-     <section className="flex-1 space-y-6">
-  {/* Upload */}
-  <div
-    ref={dropRef}
-    className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur p-6 transition hover:border-emerald-500/40"
-  >
-    <p className="font-medium mb-2 text-sm">Upload Image</p>
-    <label
-      htmlFor="file"
-      className="block cursor-pointer text-center border border-dashed rounded-xl p-6 hover:bg-zinc-100/40 dark:hover:bg-zinc-800/50 transition"
-    >
-      <input
-        type="file"
-        id="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handleFile(f);
-        }}
-      />
-      <div className="text-sm text-zinc-500">
-        Drag & drop or <span className="underline">browse</span>
-      </div>
-      {file && (
-        <div className="mt-2 text-xs text-zinc-400">
-          {file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB
-        </div>
-      )}
-      {imgMeta && (
-        <div className="mt-1 text-xs text-zinc-400">
-          Original: {imgMeta.w} × {imgMeta.h}px
-        </div>
-      )}
-    </label>
-    {uploading && <div className="mt-3 text-xs text-amber-600">Uploading…</div>}
-  </div>
-
-  {/* Dimensions */}
-  <div className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur p-6">
-    <p className="font-medium mb-4 text-sm">Resize Options</p>
-
-    {/* Make inputs match button width and center on mobile */}
-    <div className="w-full">
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 items-end">
-        {/* Width */}
-        <div className="w-full">
-          <label className="text-xs text-zinc-500">Width (px)</label>
-          <input
-            type="number"
-            value={dims?.w || ""}
-            onChange={(e) => onWidth(Number(e.target.value))}
-            className="mt-1 w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent"
-          />
-        </div>
-
-        {/* Lock centered */}
-        <button
-          type="button"
-          onClick={() => dims && setDims({ ...dims, lock: !dims.lock })}
-          className={`mx-auto h-11 w-11 rounded-lg flex items-center justify-center border transition
-            ${dims?.lock ? "border-emerald-500 text-emerald-500" : "border-zinc-400 text-zinc-400"}`}
-          title={dims?.lock ? "Unlock aspect ratio" : "Lock aspect ratio"}
-        >
-          {dims?.lock ? "🔒" : "🔓"}
-        </button>
-
-        {/* Height */}
-        <div className="w-full">
-          <label className="text-xs text-zinc-500">Height (px)</label>
-          <input
-            type="number"
-            value={dims?.h || ""}
-            onChange={(e) => onHeight(Number(e.target.value))}
-            className="mt-1 w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent"
-          />
-        </div>
-      </div>
+     <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-lg bg-white/70 dark:bg-zinc-950/60 border-b border-zinc-200/60 dark:border-zinc-800/60">
+  <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+    {/* Brand */}
+    <div className="flex items-center gap-1 sm:gap-1">
+      <img src={Logo} alt="LambdaStudio logo" className="h-8 w-8 sm:h-10 sm:w-10 object-contain" />
+      <h1 className="text-2xl font-semibold tracking-tight flex items-baseline">
+        <span className="bg-gradient-to-r from-emerald-500 to-sky-500 bg-clip-text text-transparent">Lambda</span>
+        <span className="text-zinc-900 dark:text-zinc-100">Studio</span>
+      </h1>
     </div>
 
-    {/* Process button */}
-    <button
-      onClick={onProcess}
-      disabled={!key || processing}
-      className="mt-6 relative w-full h-12 rounded-xl bg-black text-white dark:bg-white dark:text-black disabled:opacity-50 overflow-hidden group"
-    >
-      <span className="relative z-10">
-        {processing ? "Processing…" : "Resize Image"}
-      </span>
-      <span className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity blur-lg"></span>
-    </button>
-
-    {/* Palette button (rainbow animated border) */}
-    <div className="mt-4 relative">
-      <div className="absolute inset-0 rounded-xl p-[2px] animate-[borderSpin_3s_linear_infinite] bg-[conic-gradient(from_0deg,red,orange,yellow,green,cyan,blue,purple,red)]">
-        <div className="h-full w-full bg-white dark:bg-zinc-900 rounded-[10px]"></div>
-      </div>
+    {/* Right actions */}
+    <div className="flex items-center gap-4">
       <button
-        onClick={onPalette}
-        disabled={!key || uploading}
-        className="relative z-10 w-full h-12 font-medium text-lg rounded-xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur hover:scale-[1.01] active:scale-[0.99] transition-transform"
+        onClick={scrollToInstructions}
+        className="text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:text-emerald-500 transition"
+        aria-label="Scroll to instructions"
       >
-        Get Palette 🎨
+        Instructions
+      </button>
+      <a
+        href="https://github.com/kmdev77/lambdastudio"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group"
+        aria-label="Open GitHub repository"
+        title="GitHub"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          className="h-5 w-5 text-zinc-700 dark:text-zinc-300 group-hover:text-emerald-500 transition"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path d="M12 2C6.477 2 2 6.486 2 12.021c0 4.424 2.865 8.172 6.839 9.492.5.093.683-.217.683-.483 0-.238-.009-.869-.014-1.705-2.782.605-3.369-1.343-3.369-1.343-.455-1.158-1.111-1.468-1.111-1.468-.909-.622.069-.609.069-.609 1.004.071 1.532 1.032 1.532 1.032.893 1.53 2.345 1.088 2.914.833.091-.648.35-1.088.636-1.338-2.221-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.03-2.688-.103-.253-.447-1.27.098-2.646 0 0 .84-.27 2.75 1.027A9.564 9.564 0 0 1 12 6.844c.851.004 1.708.116 2.509.341 1.909-1.297 2.748-1.027 2.748-1.027.546 1.376.202 2.393.1 2.646.641.7 1.028 1.595 1.028 2.688 0 3.848-2.338 4.695-4.566 4.944.359.31.679.92.679 1.855 0 1.339-.012 2.419-.012 2.749 0 .268.18.58.689.481C19.14 20.19 22 16.444 22 12.021 22 6.486 17.522 2 12 2z"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+</header>
+
+
+
+      {/* MAIN: grid; left column flex stack */}
+      <main className="pt-20 max-w-6xl w-full mx-auto px-4 py-8 grid lg:grid-cols-12 gap-8 items-stretch">
+        {/* LEFT COLUMN */}
+        <div className="lg:col-span-5 flex flex-col gap-6 h-full">
+          {/* Upload */}
+          <div
+            ref={dropRef}
+            className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur p-6 transition hover:border-emerald-500/40"
+          >
+            <p className="font-medium mb-2 text-sm">Upload Image</p>
+            <label
+              htmlFor="file"
+              className="block cursor-pointer text-center border border-dashed rounded-xl p-6 hover:bg-zinc-100/40 dark:hover:bg-zinc-800/50 transition"
+            >
+              <input
+                type="file"
+                id="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFile(f);
+                }}
+              />
+              <div className="text-sm text-zinc-500">
+                Drag & drop or <span className="underline">browse</span>
+              </div>
+              {file && (
+                <div className="mt-2 text-xs text-zinc-400">
+                  {file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB
+                </div>
+              )}
+              {imgMeta && (
+                <div className="mt-1 text-xs text-zinc-400">
+                  Original: {imgMeta.w} × {imgMeta.h}px
+                </div>
+              )}
+            </label>
+            {uploading && <div className="mt-3 text-xs text-amber-600">Uploading…</div>}
+          </div>
+
+          {/* Resize Options */}
+          <div className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur p-6">
+            <p className="font-medium mb-4 text-sm">Resize Options</p>
+
+           <div className="w-full">
+
+  {/* Mobile / small tablet: stacked inputs + centered lock */}
+  <div className="md:hidden space-y-3">
+    {/* Width */}
+    <div>
+      <label className="text-xs text-zinc-500">Width (px)</label>
+      <input
+        type="number"
+        value={dims?.w || ""}
+        onChange={(e) => onWidth(Number(e.target.value))}
+        className="mt-1 w-full h-11 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent"
+      />
+    </div>
+
+    {/* Lock row — centered, equal top/bottom space */}
+    <div className="flex justify-center py-2">
+      <button
+        type="button"
+        onClick={() => dims && setDims({ ...dims, lock: !dims.lock })}
+        className={`h-10 w-10 rounded-lg flex items-center justify-center border transition
+          ${dims?.lock ? "border-emerald-500 text-emerald-500" : "border-zinc-400 text-zinc-400"}`}
+        title={dims?.lock ? "Unlock aspect ratio" : "Lock aspect ratio"}
+        aria-label={dims?.lock ? "Unlock aspect ratio" : "Lock aspect ratio"}
+      >
+        {dims?.lock ? "🔒" : "🔓"}
       </button>
     </div>
 
-    {note && <p className="mt-3 text-xs text-zinc-500">{note}</p>}
+    {/* Height */}
+    <div>
+      <label className="text-xs text-zinc-500">Height (px)</label>
+      <input
+        type="number"
+        value={dims?.h || ""}
+        onChange={(e) => onHeight(Number(e.target.value))}
+        className="mt-1 w-full h-11 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent"
+      />
+    </div>
   </div>
+
+  {/* Desktop (md+): keep original 3-column grid */}
+  <div className="hidden md:grid grid-cols-[1fr_auto_1fr] gap-3 items-end">
+    {/* Width */}
+    <div className="w-full">
+      <label className="text-xs text-zinc-500">Width (px)</label>
+      <input
+        type="number"
+        value={dims?.w || ""}
+        onChange={(e) => onWidth(Number(e.target.value))}
+        className="mt-1 w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent"
+      />
+    </div>
+
+    {/* Lock */}
+    <button
+      type="button"
+      onClick={() => dims && setDims({ ...dims, lock: !dims.lock })}
+      className={`mx-auto h-11 w-11 rounded-lg flex items-center justify-center border transition
+        ${dims?.lock ? "border-emerald-500 text-emerald-500" : "border-zinc-400 text-zinc-400"}`}
+      title={dims?.lock ? "Unlock aspect ratio" : "Lock aspect ratio"}
+      aria-label={dims?.lock ? "Unlock aspect ratio" : "Lock aspect ratio"}
+    >
+      {dims?.lock ? "🔒" : "🔓"}
+    </button>
+
+    {/* Height */}
+    <div className="w-full">
+      <label className="text-xs text-zinc-500">Height (px)</label>
+      <input
+        type="number"
+        value={dims?.h || ""}
+        onChange={(e) => onHeight(Number(e.target.value))}
+        className="mt-1 w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent"
+      />
+    </div>
+  </div>
+
+</div>
+
+
+            {/* Process */}
+            <button
+              onClick={onProcess}
+              disabled={!key || processing}
+              className="mt-6 relative w-full h-12 rounded-xl bg-black text-white dark:bg-white dark:text-black disabled:opacity-50 overflow-hidden group"
+            >
+              <span className="relative z-10">
+                {processing ? "Processing…" : "Resize Image"}
+              </span>
+              <span className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity blur-lg"></span>
+            </button>
+
+            {/* Palette */}
+            <div className="mt-4 relative">
+              <div className="absolute inset-0 rounded-xl p-[2px]  bg-[conic-gradient(from_0deg,red,orange,yellow,green,cyan,blue,purple,red)]">
+                <div className="h-full w-full bg-white dark:bg-zinc-900 rounded-[10px]"></div>
+              </div>
+              <button
+                onClick={onPalette}
+                disabled={!key || uploading}
+                className="relative z-10 w-full h-12 font-medium text-lg rounded-xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur hover:scale-[1.01] active:scale-[0.99] transition-transform"
+              >
+                Get Palette 🎨
+              </button>
+            </div>
+
+            {note && <p className="mt-3 text-xs text-zinc-500">{note}</p>}
+          </div>
+
+          {/* INTRO CARD — desktop snug filler */}
+         {/* INTRO CARD — desktop snug filler */}
+<section
+  className="
+    rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70
+    bg-white/70 dark:bg-zinc-900/70 backdrop-blur
+    p-6 md:p-7 shadow-sm
+    hidden md:flex flex-col flex-1
+  "
+>
+  <h2 className="text-2xl md:text-3xl font-semibold mb-3 bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent">
+    🧠 How It Works
+  </h2>
+  <p className="text-zinc-600 dark:text-zinc-400 mb-5">
+    Welcome to <span className="font-medium text-emerald-500">Lambda Studio Image Resizer</span> — a smart, cloud-powered tool that helps you resize, preview, and extract color palettes from your images in seconds.
+  </p>
+
+  <ul className="space-y-3 text-zinc-700 dark:text-zinc-300 text-sm leading-relaxed">
+    <li>
+      <span className="font-semibold">1. Upload your image:</span> Click or drag any photo into the upload box. Supports JPG, PNG, and WebP formats.
+    </li>
+    <li>
+      <span className="font-semibold">2. Preview instantly:</span> See your image immediately after upload to check framing and colors before resizing.
+    </li>
+    <li>
+      <span className="font-semibold">3. Resize with precision:</span> Adjust width and height (up to 4096 px).  
+      Use the 🔒 icon to keep aspect ratio locked, or 🔓 to freely customize dimensions.
+    </li>
+    <li>
+      <span className="font-semibold">4. Get your palette:</span> Press <span className="font-medium text-emerald-500">Get Palette 🎨</span> to instantly extract dominant colors from your image — perfect for branding and design themes.
+    </li>
+    <li>
+      <span className="font-semibold">5. Apply adjustments:</span> When ready, hit <span className="font-medium text-emerald-500">Resize</span> to generate an optimized, downloadable version.
+    </li>
+  </ul>
+
+  <p className="mt-auto pt-5 text-zinc-500 dark:text-zinc-500 text-sm">
+    💡 Ideal for creators and developers who need fast cloud processing with consistent color matching and clean export quality.
+  </p>
 </section>
 
-        {/* Preview */}
-        <section className="flex-1 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur p-6">
+        </div>
+
+        {/* RIGHT COLUMN */}
+        <section className="lg:col-span-7 rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur p-6 flex flex-col">
           <p className="font-medium mb-4 text-sm">Preview</p>
-                    {/* <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 aspect-square flex items-center justify-center bg-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAK0lEQVQoU2NkYGD4z0AEYBxVSFUwCqjZKFYBjNolYo1A1CBRwFqDKAAAjDgw4ihA0hYAAAAASUVORK5CYII=')]"> */}
 
           <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 aspect-square flex items-center justify-center">
             {previewUrl ? (
@@ -274,28 +393,114 @@ export default function App() {
             )}
           </div>
 
-          {/* Palette display */}
           {palette && (
-            <div className="mt-6">
+            <div className="mt-6 relative">
               <p className="font-medium mb-2 text-sm">Extracted Palette</p>
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {palette.map((hex, i) => (
-                  <div key={i} className="flex-shrink-0 w-12 h-12 rounded-lg border border-zinc-300 dark:border-zinc-700 flex items-center justify-center font-mono text-[10px]" style={{ backgroundColor: hex }}>
-                    <span className={parseInt(hex.replace("#", ""), 16) > 0xffffff / 2 ? "text-black" : "text-white"}>{hex}</span>
-                  </div>
-                ))}
+
+              {/* Desktop lamb */}
+              <img
+                src={LambHex}
+                alt="Lamb says: I got your HEX 😎"
+                className="hidden lg:block absolute top-[-32px] right-[0px] w-44 max-w-[140px] pointer-events-none select-none drop-shadow-[0_0_25px_rgba(0,0,0,0.35)]"
+              />
+
+              {/* MOBILE/TABLET layout */}
+              <div className="grid grid-cols-[1fr_auto] items-center gap-2 lg:block">
+                <div className="flex gap-2 overflow-x-auto pb-2 pr-2 lg:pr-0">
+                  {palette.map((hex, i) => (
+                    <div
+                      key={i}
+                      className="flex-shrink-0 w-12 h-12 rounded-lg border border-zinc-300 dark:border-zinc-700 flex items-center justify-center font-mono text-[10px]"
+                      style={{ backgroundColor: hex }}
+                    >
+                      <span className={parseInt(hex.replace("#", ""), 16) > 0xffffff / 2 ? "text-black" : "text-white"}>
+                        {hex}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <img
+                  src={LambHex}
+                  alt="Lamb says: I got your HEX 😎"
+                  className="block lg:hidden w-24 xs:w-40 sm:w-44 md:w-58 object-contain pointer-events-none select-none"
+                />
               </div>
-              {paletteUrl && <img src={paletteUrl} alt="Palette Preview" className="mt-3 rounded-xl border border-zinc-200 dark:border-zinc-800" />}
+
+              {paletteUrl && (
+                <img
+                  src={paletteUrl}
+                  alt="Palette Preview"
+                  className="mt-3 rounded-xl border border-zinc-200 dark:border-zinc-800"
+                />
+              )}
             </div>
           )}
         </section>
       </main>
 
+      {/* MOBILE-ONLY How It Works (placed RIGHT BEFORE FOOTER) */}
+  <section
+  className="md:hidden max-w-6xl w-full mx-auto px-4 mb-8 scroll-mt-24"
+  data-hiw="true"
+>
+  <div className="rounded-2xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur p-6 shadow-sm">
+    <h2 className="text-2xl font-semibold mb-3 bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent">
+      🧠 How It Works
+    </h2>
+    <p className="text-zinc-600 dark:text-zinc-400 mb-5">
+      Welcome to <span className="font-medium text-emerald-500">Lambda Studio Image Resizer</span> — 
+      a fast, cloud-powered tool that helps you resize, preview, and extract color palettes from your images in seconds.
+    </p>
+
+    <ul className="space-y-3 text-zinc-700 dark:text-zinc-300 text-sm leading-relaxed">
+      <li>
+        <span className="font-semibold">1. Upload your image:</span> Tap or drag any photo into the upload box. Supports JPG, PNG, and WebP formats.
+      </li>
+      <li>
+        <span className="font-semibold">2. Preview instantly:</span> Your image appears right away so you can check its composition or colors before editing.
+      </li>
+      <li>
+        <span className="font-semibold">3. Resize with precision:</span> Adjust width and height (up to 4096 px).  
+        Use the <span className="text-emerald-500">🔒</span> icon to keep aspect ratio locked, or <span className="text-emerald-500">🔓</span> to freely customize dimensions.
+      </li>
+      <li>
+        <span className="font-semibold">4. Get your palette:</span> Tap <span className="font-medium text-emerald-500">Get Palette 🎨</span> to instantly extract your image’s dominant colors — ideal for brand or theme matching.
+      </li>
+      <li>
+        <span className="font-semibold">5. Apply adjustments:</span> Hit <span className="font-medium text-emerald-500">Resize</span> to create an optimized, downloadable version.
+      </li>
+    </ul>
+
+    <p className="mt-6 text-zinc-500 dark:text-zinc-500 text-sm">
+      💡 Perfect for creators, designers, and developers who want quick, accurate resizing with palette matching on the go.
+    </p>
+  </div>
+</section>
+
+
+      {/* FOOTER aligned to content edges */}
+      {/* <footer className="border-t border-zinc-200/60 dark:border-zinc-800/60 py-6">
+        <div className="relative max-w-6xl mx-auto px-4">
+          <span className="pointer-events-none absolute -top-[1px] left-0 right-0 h-[2px] bg-gradient-to-r from-pink-500 via-emerald-400 to-cyan-500 animate-[rainbow_4s_linear_infinite]" />
+          <div className="flex flex-col md:flex-row items-center justify-between text-sm text-zinc-500 dark:text-zinc-400">
+            <div className="flex items-center mb-4 md:mb-0">
+              <img src={Logo} alt="Lambda Studio" className="w-7 h-7 mr-2 select-none" />
+              <span className="font-semibold tracking-wide">Lambda Studio</span>
+            </div>
+            <div className="flex space-x-6 text-zinc-600 dark:text-zinc-400">
+              <a href="https://lambda-studio-docs.example.com" className="hover:text-emerald-500 transition" target="_blank" rel="noopener noreferrer">Docs</a>
+              <a href="https://github.com/yourusername/lambda-studio" className="hover:text-emerald-500 transition" target="_blank" rel="noopener noreferrer">GitHub</a>
+              <a href="#about" className="hover:text-emerald-500 transition">About</a>
+            </div>
+          </div>
+        </div>
+      </footer> */}
+
       <style>{`
-        // @keyframes borderSpin {
-        //   0% { transform: rotate(0deg); }
-        //   100% { transform: rotate(360deg); }
-        // }
+@keyframes rainbow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+.bg-gradient-to-r { background-size: 200% 200%; }
+@keyframes borderSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       `}</style>
     </div>
   );
