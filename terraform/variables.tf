@@ -9,7 +9,7 @@ variable "aws_region" {
 }
 
 variable "bucket_name" {
-  type    = string
+  type = string
 }
 
 variable "hf_token" {

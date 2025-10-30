@@ -12,6 +12,8 @@ const BUCKET_NAME   = (process.env.BUCKET_NAME || "").trim().replace(/^['"]|['"]
 const OUTPUT_PREFIX = ((process.env.OUTPUT_PREFIX || "thumbs/").trim()).replace(/^\/+|\/+$/g, "") + "/";
 const HF_TOKEN      = (process.env.HF_TOKEN || "").trim().replace(/^['"]|['"]$/g, "");
 const FAL_TASK_URL  = (process.env.FAL_TASK_URL || "https://router.huggingface.co/fal-ai/fal-ai/bria/background/remove?_subdomain=queue").trim();
+const MAX_PX        = Number(process.env.MAX_PX || 4096);
+const SIGNED_URL_TTL_SECONDS = Number(process.env.SIGNED_URL_TTL_SECONDS || 3600);
 
 /* ---------------- Small helpers ---------------- */
 const ok = (code, body) => ({
@@ -19,6 +21,7 @@ const ok = (code, body) => ({
   headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
   body: JSON.stringify(body),
 });
+const clamp = (n) => Math.max(1, Math.min(MAX_PX, Math.round(Number(n) || 0)));
 
 async function s3GetBuffer(s3, bucket, key, GetObjectCommand) {
   const obj = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
@@ -28,27 +31,13 @@ async function s3GetBuffer(s3, bucket, key, GetObjectCommand) {
 }
 
 /* ---------------- fal-ai background removal ---------------- */
-/**
- * Flow:
- *  1) POST multipart (image) to FAL_TASK_URL  -> JSON with response_url (202) or sometimes immediate payload.
- *  2) Poll response_url until status is completed.
- *     - If first poll with Authorization returns 401, retry immediately WITHOUT Authorization (presigned URL).
- *  3) Return Buffer (by URL fetch or base64).
- */
-
-// ---- replace your removeBgFal with this version ----
 async function removeBgFal(buffer, tokenParam) {
-  // Self-heal: pull directly from env if caller didn't pass it
   const tok = (tokenParam ?? process.env.HF_TOKEN ?? "").trim().replace(/^['"]|['"]$/g, "");
-  const tokTail = tok ? tok.slice(-6) : "";
-  console.log("RMBG: token present?", !!tok, "tail:", tokTail); // one-time sanity log
-
   if (!tok) throw new Error("HF token missing (set HF_TOKEN).");
 
   const form = new FormData();
   form.append("image", new Blob([buffer], { type: "image/png" }), "input.png");
 
-  // start job
   const start = await fetch(FAL_TASK_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${tok}` },
@@ -66,7 +55,6 @@ async function removeBgFal(buffer, tokenParam) {
     throw new Error(`fal start failed: ${start.status} ${snippet}`);
   }
 
-  // immediate payload?
   const immediate = await normalizeFalOutputToBuffer(firstJson || {}, tok);
   if (immediate) return immediate;
 
@@ -78,7 +66,6 @@ async function removeBgFal(buffer, tokenParam) {
 
   if (!responseUrl) throw new Error("fal queue did not provide response_url.");
 
-  // poll up to 60s; if first poll 401, retry without auth
   const deadlineMs = 60000;
   const begin = Date.now();
   let delayMs = 500;
@@ -127,16 +114,9 @@ async function removeBgFal(buffer, tokenParam) {
   }
 }
 
-// ---- ensure your handler calls it like this (but even if not, it self-heals) ----
-const token = process.env.HF_TOKEN;  // optional; function will read env itself
-const baseBuf = removeBg ? await removeBgFal(original, token) : original;
-
-
-/** Normalize fal payload variants to a Buffer (URL fetch or base64). */
 async function normalizeFalOutputToBuffer(data, token) {
   if (!data) return null;
 
-  // URL forms
   const urlLike =
     data?.image?.url ||
     data?.output?.url ||
@@ -152,7 +132,6 @@ async function normalizeFalOutputToBuffer(data, token) {
     return Buffer.from(ab);
   }
 
-  // Base64 forms
   const b64 =
     data?.image?.b64_json ||
     data?.b64image ||
@@ -161,7 +140,6 @@ async function normalizeFalOutputToBuffer(data, token) {
     data?.outputs?.[0]?.b64_json;
   if (b64) return Buffer.from(b64, "base64");
 
-  // data: URL literal
   const possible = data?.image || data?.output || data?.result;
   if (typeof possible === "string") {
     const m = possible.match(/^data:.+;base64,(.+)$/);
@@ -182,10 +160,19 @@ export const handler = async (event) => {
     if (event?.isBase64Encoded) raw = Buffer.from(raw, "base64").toString("utf8");
     const body = JSON.parse(raw || "{}");
 
-    const { key, w, h, fit = "contain", removeBg = false, withoutEnlargement = true } = body || {};
-    const width  = Number(w);
-    const height = Number(h);
+    // NOTE: withoutEnlargement now **defaults to false** (allow upscaling)
+    const {
+      key,
+      w,
+      h,
+      fit = "contain",
+      removeBg = false,
+      withoutEnlargement = false
+    } = body || {};
 
+    // Validate/clamp
+    const width  = clamp(w);
+    const height = clamp(h);
     if (!BUCKET_NAME || !key || !width || !height) {
       return ok(400, { error: "Missing required fields: key, w, h" });
     }
@@ -200,47 +187,64 @@ export const handler = async (event) => {
     // Read original
     const original = await s3GetBuffer(s3, BUCKET_NAME, key, GetObjectCommand);
 
-    // Optional background removal (fal-only)
+    // Optional background removal
     const baseBuf = removeBg ? await removeBgFal(original, HF_TOKEN) : original;
 
-    // Resize/encode
-    const img  = sharp(baseBuf);
-    const meta = await img.metadata();
+    // Probe metadata to decide output format
+    const meta = await sharp(baseBuf).metadata();
+    const hasAlpha = meta.hasAlpha === true || removeBg === true;
 
-    const isTransparent = (meta.hasAlpha === true) || removeBg;
-    const pipeline = img
+    // To avoid black bars when using "contain", we set transparent background and output PNG.
+    const useTransparentCanvas = fit === "contain";
+    const outIsPng = hasAlpha || useTransparentCanvas;
+
+    // Resize
+    const pipeline = sharp(baseBuf)
       .resize({
-        width, height, fit,
+        width,
+        height,
+        fit,
         position: "attention",
-        withoutEnlargement,
+        withoutEnlargement: !!withoutEnlargement,
         kernel: sharp.kernel.lanczos3,
+        background: useTransparentCanvas
+          ? { r: 0, g: 0, b: 0, alpha: 0 }     // transparent canvas
+          : { r: 255, g: 255, b: 255, alpha: 1 }, // white if not using contain
       })
       .sharpen();
 
-    const outBuf = isTransparent
+    const outBuf = outIsPng
       ? await pipeline.png().toBuffer()
-      : await pipeline.jpeg({ quality: 90 }).toBuffer();
+      : await pipeline.jpeg({ quality: 90, chromaSubsampling: "4:4:4" }).toBuffer();
 
     // Output S3 path
     const baseName = (key.split("/").pop() || "image").replace(/\.(png|jpe?g|webp|gif|bmp|tiff)$/i, "");
-    const outExt   = isTransparent ? "png" : "jpg";
-    const outKey   = `${OUTPUT_PREFIX}${width}x${height}/${baseName}.${outExt}`;
+    const outExt   = outIsPng ? "png" : "jpg";
+    const outKey   = `${OUTPUT_PREFIX}${width}x${height}/${fit}/${baseName}.${outExt}`;
 
     await s3.send(new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: outKey,
       Body: outBuf,
-      ContentType: isTransparent ? "image/png" : "image/jpeg",
+      ContentType: outIsPng ? "image/png" : "image/jpeg",
       CacheControl: "private, max-age=31536000",
     }));
 
     const url = await getSignedUrl(
       s3,
       new GetObjectCommand({ Bucket: BUCKET_NAME, Key: outKey }),
-      { expiresIn: 3600 }
+      { expiresIn: SIGNED_URL_TTL_SECONDS }
     );
 
-    return ok(200, { url, key: outKey, bucket: BUCKET_NAME });
+    return ok(200, {
+      url,
+      key: outKey,
+      bucket: BUCKET_NAME,
+      width,
+      height,
+      fit,
+      withoutEnlargement: !!withoutEnlargement,
+    });
   } catch (err) {
     console.error("Handler error:", err);
     return ok(500, { error: String(err?.message || err) });
