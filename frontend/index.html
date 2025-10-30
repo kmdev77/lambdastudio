@@ -6,11 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
  
   <script src="https://cdn.tailwindcss.com"></script>
+ 
 
+    <script>
+  (function () {
+    const stored = localStorage.getItem('theme'); // 'dark' | 'light' | null
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = stored || (systemPrefersDark ? 'dark' : 'light');
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
 
     <title>LambdaStudio</title>
   </head>
-  <body>
+   <body class="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -6,7 +6,7 @@ import IntroExplainer from "./IntroExplainer"
 // at top of your component file
 import thumbsLeft from "./assets/thumbs-left-2.png"; // adjust path if different
 
-
+import ThemeToggle from './ThemeToggle';
 
 
 const MAX_PX = 4096;
@@ -297,6 +297,8 @@ async function downloadResized() {
       >
         Instructions
       </button> */}
+
+        {/* <ThemeToggle /> */}
             <a
               href="https://github.com/kmdev77/lambdastudio"
               target="_blank"
