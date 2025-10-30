@@ -4,7 +4,7 @@ import LambHex from "./assets/lamb-hex.png";
 // import LambHead from "./assets/lamdahead.png"
 import IntroExplainer from "./IntroExplainer"
 // at top of your component file
-import thumbsLeft from "./assets/thumbs-left.png"; // adjust path if different
+import thumbsLeft from "./assets/thumbs-left-2.png"; // adjust path if different
 
 
 
@@ -18,6 +18,10 @@ export default function App() {
   const [processOk, setProcessOk] = useState(false);
   const [uploadKey, setUploadKey] = useState<string | null>(null);     // uploads/...
   const [processedKey, setProcessedKey] = useState<string | null>(null); // thumbs/... (optional)
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultDownloadUrl, setResultDownloadUrl] = useState<string | null>(null);
+
+
 
   const apiUrl = import.meta.env.VITE_API_URL as string;
   const bucketEnv = (import.meta.env.VITE_S3_BUCKET as string) || "";
@@ -107,113 +111,157 @@ export default function App() {
     });
   }
 
- async function onProcess() {
-  if (!key || !dims) return;
-  try {
-    setProcessOk(false);         // reset success icon at start
-    setProcessing(true);
-    setNote("Processing image…");
+  async function onProcess() {
+    if (!key || !dims) return;
+    try {
+      setProcessOk(false);         // reset success icon at start
+      setProcessing(true);
+      setNote("Processing image…");
 
-    const res = await fetch(`${apiUrl}/process`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        key,
-        w: dims.w,
-        h: dims.h,
-        fit: dims.fit,
-        withoutEnlargement: false
-      })
-    });
+      const res = await fetch(`${apiUrl}/process`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key,
+          w: dims.w,
+          h: dims.h,
+          fit: dims.fit,
+          withoutEnlargement: false
+        })
+      });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.error || "Process failed");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Process failed");
 
-    // Capture keys from response
-    const outKey: string | undefined =
-      data.outputKey || data.output_key || data.key; // processed key
+      // Capture keys from response
+      const outKey: string | undefined =
+        data.outputKey || data.output_key || data.key; // processed key
 
-    // Keep whatever your UI expects in `key` (usually the latest/processed key is fine)
-    if (typeof data.key === "string") setKey(data.key);
+      // Keep whatever your UI expects in `key` (usually the latest/processed key is fine)
+      if (typeof data.key === "string") setKey(data.key);
 
-    // Remember the processed key separately (DO NOT touch uploadKey here)
-    if (outKey) setProcessedKey(outKey);
+      // Remember the processed key separately (DO NOT touch uploadKey here)
+      if (outKey) setProcessedKey(outKey);
 
-    // Prefer direct URL fields
-    let rawUrl: string | undefined = data.outputUrl || data.url || data.s3Url;
+      // Prefer direct URL fields
+      let rawUrl: string | undefined = data.outputUrl || data.url || data.s3Url;
 
-    // Build URL from key if needed
-    if (!rawUrl && outKey) {
-      const m = apiUrl.match(/execute-api\.([a-z0-9-]+)\.amazonaws\.com/i);
-      const region = m?.[1] || "us-west-1";
-      const bucket = data.bucket || bucketLabel || (import.meta.env.VITE_S3_BUCKET as string);
-      if (bucket) rawUrl = `https://${bucket}.s3.${region}.amazonaws.com/${outKey}`;
-    }
+      // Build URL from key if needed
+      if (!rawUrl && outKey) {
+        const m = apiUrl.match(/execute-api\.([a-z0-9-]+)\.amazonaws\.com/i);
+        const region = m?.[1] || "us-west-1";
+        const bucket = data.bucket || bucketLabel || (import.meta.env.VITE_S3_BUCKET as string);
+        if (bucket) rawUrl = `https://${bucket}.s3.${region}.amazonaws.com/${outKey}`;
+      }
 
-    if (!rawUrl) {
-      setNote("Processed successfully, but no URL/key returned.");
-      setProcessOk(true);
-      return;
-    }
+      if (!rawUrl) {
+        setNote("Processed successfully, but no URL/key returned.");
+        setProcessOk(true);
+        return;
+      }
 
-    // 🔒 If it's a pre-signed URL, do NOT modify it (no cache-buster)
-    const isPresigned = /[?&]X-Amz-Signature=|[?&]X-Amz-Algorithm=/i.test(rawUrl);
-    const finalUrl = isPresigned
-      ? rawUrl
-      : (/^https?:/i.test(rawUrl)
+      // 🔒 If it's a pre-signed URL, do NOT modify it (no cache-buster)
+      const isPresigned = /[?&]X-Amz-Signature=|[?&]X-Amz-Algorithm=/i.test(rawUrl);
+      const finalUrl = isPresigned
+        ? rawUrl
+        : (/^https?:/i.test(rawUrl)
           ? `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}t=${Date.now()}`
           : rawUrl);
 
-    // Verify it loads
-    await new Promise<void>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error(`Failed to load: ${finalUrl}`));
-      img.src = finalUrl;
-    });
+      // Verify it loads
+      await new Promise<void>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error(`Failed to load: ${finalUrl}`));
+        img.src = finalUrl;
+      });
 
-    setPreviewUrl(finalUrl);
-    setNote("Processed successfully.");
-    setProcessOk(true);          // success icon ON
-  } catch (e: any) {
-    console.error(e);
-    setNote(`Process error: ${e.message}`);
-    setProcessOk(false);
-  } finally {
-    setProcessing(false);
+      setPreviewUrl(finalUrl);
+      setResultUrl(finalUrl);
+      setResultDownloadUrl(data.downloadUrl || null);
+      setNote("Processed successfully.");
+      setProcessOk(true);          // success icon ON
+    } catch (e: any) {
+      console.error(e);
+      setNote(`Process error: ${e.message}`);
+      setProcessOk(false);
+    } finally {
+      setProcessing(false);
+    }
   }
-}
 
 
   async function onPalette() {
-  if (!uploadKey) {
-    setNote("Palette error: no uploaded file key. Upload an image first.");
-    return;
+    if (!uploadKey) {
+      setNote("Palette error: no uploaded file key. Upload an image first.");
+      return;
+    }
+    try {
+      setProcessing(true);
+      setNote("Extracting palette…");
+      setPalette(null);
+
+      const res = await fetch(`${apiUrl}/palette`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: uploadKey })   // <-- IMPORTANT
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Palette failed");
+
+      setPalette(data.colors);
+      setPaletteUrl(data.previewUrl);
+      setNote("Palette ready!");
+      // (optional) set a paletteOk flag if you're showing the icon here too
+    } catch (e: any) {
+      setNote(`Palette error: ${e.message}`);
+    } finally {
+      setProcessing(false);
+    }
   }
+
+
+async function downloadResized() {
+  if (!resultUrl && !resultDownloadUrl) return;
+
   try {
-    setProcessing(true);
-    setNote("Extracting palette…");
-    setPalette(null);
+    // Prefer server-signed "attachment" URL if present
+    const href = resultDownloadUrl || resultUrl!;
+    const isPresigned = /[?&]X-Amz-(Signature|Algorithm|Credential)=/i.test(href);
 
-    const res = await fetch(`${apiUrl}/palette`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: uploadKey })   // <-- IMPORTANT
-    });
+    // Cross-origin downloads don’t report completion; show a start message.
+    setNote("Download started…");
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.error || "Palette failed");
+    if (isPresigned || /^https?:/i.test(href)) {
+      // Open in a new tab; if server set Content-Disposition: attachment,
+      // the browser will trigger Save As…
+      const a = document.createElement("a");
+      a.href = href;
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      return;
+    }
 
-    setPalette(data.colors);
-    setPaletteUrl(data.previewUrl);
-    setNote("Palette ready!");
-    // (optional) set a paletteOk flag if you're showing the icon here too
+    // data: URL or same-origin fallback (nice filename)
+    if (/^data:/i.test(href)) {
+      const a = document.createElement("a");
+      a.href = href;
+      const ext = href.match(/^data:image\/(\w+)/i)?.[1] || "png";
+      a.download = `resized_${dims?.w || ""}x${dims?.h || ""}.${ext}`;
+      a.click();
+      return;
+    }
   } catch (e: any) {
-    setNote(`Palette error: ${e.message}`);
-  } finally {
-    setProcessing(false);
+    setNote(`Download error: ${e.message}`);
   }
 }
+
+
+
 
 
   const clamp = (n: number) => Math.max(1, Math.min(MAX_PX, Math.round(n)));
@@ -474,6 +522,13 @@ export default function App() {
             )}
           </div>
 
+          <button
+            onClick={downloadResized}
+            disabled={!resultUrl || processing || uploading}
+            className="mt-3 w-full h-11 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white/80 dark:bg-zinc-900/80 text-sm font-medium disabled:opacity-50"
+          >
+            Download Resized Image
+          </button>
 
           {palette && (
             <div className="mt-6 relative">
