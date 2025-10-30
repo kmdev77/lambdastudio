@@ -2,8 +2,8 @@
 @font-face {
   font-family: 'Satoshi-Black';
   src:
-       url('./assets/Satoshi-Black.ttf') format('truetype');
-  font-weight: 900;
+       url('./assets/Satoshi-Variable.ttf') format('truetype');
+  font-weight: 700;
   font-display: swap;
   font-style: normal;
 }
