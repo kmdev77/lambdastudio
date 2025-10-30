@@ -6,6 +6,12 @@ Lambda Studio is a full-stack, serverless image processing and AI inference plat
 
 This project demonstrates an end-to-end cloud application workflow using AWS-managed services and Infrastructure as Code. It highlights practical use of serverless compute, cloud storage, API integration, and AI inference through Hugging Face.
 
+## Live Frontend URL
+
+You can view the deployed Lambda Studio application here:
+
+Frontend: https://lambda-studio.netlify.app/
+
 ## Architecture
 
 ```
