@@ -5,6 +5,8 @@ import LambHex from "./assets/lamb-hex.png";
 import IntroExplainer from "./IntroExplainer"
 // at top of your component file
 import thumbsLeft from "./assets/thumbs-left-2.png"; // adjust path if different
+import PaletteIcon from "./assets/palette-ls.png"
+import ResizeIcon from "./assets/resize-ls.png"
 
 import ThemeToggle from './ThemeToggle';
 
@@ -222,43 +224,43 @@ export default function App() {
   }
 
 
-async function downloadResized() {
-  if (!resultUrl && !resultDownloadUrl) return;
+  async function downloadResized() {
+    if (!resultUrl && !resultDownloadUrl) return;
 
-  try {
-    // Prefer server-signed "attachment" URL if present
-    const href = resultDownloadUrl || resultUrl!;
-    const isPresigned = /[?&]X-Amz-(Signature|Algorithm|Credential)=/i.test(href);
+    try {
+      // Prefer server-signed "attachment" URL if present
+      const href = resultDownloadUrl || resultUrl!;
+      const isPresigned = /[?&]X-Amz-(Signature|Algorithm|Credential)=/i.test(href);
 
-    // Cross-origin downloads don’t report completion; show a start message.
-    setNote("Download started…");
+      // Cross-origin downloads don’t report completion; show a start message.
+      setNote("Download started…");
 
-    if (isPresigned || /^https?:/i.test(href)) {
-      // Open in a new tab; if server set Content-Disposition: attachment,
-      // the browser will trigger Save As…
-      const a = document.createElement("a");
-      a.href = href;
-      a.target = "_blank";
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      return;
+      if (isPresigned || /^https?:/i.test(href)) {
+        // Open in a new tab; if server set Content-Disposition: attachment,
+        // the browser will trigger Save As…
+        const a = document.createElement("a");
+        a.href = href;
+        a.target = "_blank";
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        return;
+      }
+
+      // data: URL or same-origin fallback (nice filename)
+      if (/^data:/i.test(href)) {
+        const a = document.createElement("a");
+        a.href = href;
+        const ext = href.match(/^data:image\/(\w+)/i)?.[1] || "png";
+        a.download = `resized_${dims?.w || ""}x${dims?.h || ""}.${ext}`;
+        a.click();
+        return;
+      }
+    } catch (e: any) {
+      setNote(`Download error: ${e.message}`);
     }
-
-    // data: URL or same-origin fallback (nice filename)
-    if (/^data:/i.test(href)) {
-      const a = document.createElement("a");
-      a.href = href;
-      const ext = href.match(/^data:image\/(\w+)/i)?.[1] || "png";
-      a.download = `resized_${dims?.w || ""}x${dims?.h || ""}.${ext}`;
-      a.click();
-      return;
-    }
-  } catch (e: any) {
-    setNote(`Download error: ${e.message}`);
   }
-}
 
 
 
@@ -298,7 +300,7 @@ async function downloadResized() {
         Instructions
       </button> */}
 
-        {/* <ThemeToggle /> */}
+            {/* <ThemeToggle /> */}
             <a
               href="https://github.com/kmdev77/lambdastudio"
               target="_blank"
@@ -465,39 +467,52 @@ async function downloadResized() {
             <button
               onClick={onProcess}
               disabled={!key || processing}
-              className="mt-6 relative w-full h-12 rounded-xl bg-black text-white dark:bg-white dark:text-black disabled:opacity-50 overflow-hidden group"
+              className="mt-6 relative w-full h-12 rounded-xl bg-black text-white dark:bg-white dark:text-black disabled:opacity-50 overflow-hidden group flex items-center justify-center gap-2"
             >
-              <span className="relative z-10">
-                {processing ? "Processing…" : "Resize Image"}
+              <span className="relative z-10 flex items-center gap-2">
+                <img
+                  src={ResizeIcon}
+                  alt="Resize"
+                  className="w-5 h-auto object-contain"
+                />
+                <span>{processing ? "Processing…" : "Resize Image"}</span>
               </span>
+
               <span className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity blur-lg"></span>
             </button>
 
 
             {/* Palette */}
             <div className="mt-4 relative">
-              <div className="absolute inset-0 rounded-xl p-[2px]  bg-[conic-gradient(from_0deg,red,orange,yellow,green,cyan,blue,purple,red)]">
+              <div className="absolute inset-0 rounded-xl p-[2px] bg-[conic-gradient(from_0deg,red,orange,yellow,green,cyan,blue,purple,red)]">
                 <div className="h-full w-full bg-white dark:bg-zinc-900 rounded-[10px]"></div>
               </div>
               <button
                 onClick={onPalette}
                 disabled={!key || uploading}
-                className="relative z-10 w-full h-12 font-medium text-lg rounded-xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur hover:scale-[1.01] active:scale-[0.99] transition-transform"
+                className="relative z-10 w-full h-12 font-medium text-lg rounded-xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur hover:scale-[1.01] active:scale-[0.99] transition-transform flex items-center justify-center gap-2"
               >
-                Get Palette 🎨
+                <img
+                  src={PaletteIcon}
+                  alt="Palette"
+                  className="w-5 h-auto object-contain"
+                />
+                <span>Get Palette</span>
               </button>
             </div>
+
             {/* Status row (under the buttons) */}
-            <div className="mt-2 flex items-center text-sm text-zinc-600 dark:text-zinc-400">
-              <span className="truncate">{note}</span>
-              {!processing && processOk && (
+            <div className="mt-2 flex items-center text-md text-zinc-600 dark:text-zinc-400">
+                  {!processing && processOk && (
                 <img
                   src={thumbsLeft}
                   alt="success"
-                  className="ml-1 h-5 w-auto shrink-0 select-none"
+                  className="mr-1 h-7 w-auto shrink-0 select-none"
                   draggable={false}
                 />
               )}
+              <span className="truncate">{note}</span>
+          
             </div>
 
           </div>

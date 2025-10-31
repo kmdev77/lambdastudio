@@ -98,7 +98,7 @@ export default function IntroExplainer() {
               4. Extract your palette
             </h3>
             <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-              Press <span className="text-emerald-500 font-medium">Get Palette 🎨</span> to extract
+              Press <span className="text-emerald-500 font-medium">Get Palette</span> to extract
               dominant colors for branding or design inspiration.
             </p>
           </div>
