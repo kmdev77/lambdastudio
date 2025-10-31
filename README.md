@@ -10,7 +10,7 @@ This project demonstrates an end-to-end cloud application workflow using AWS-man
 
 You can view the deployed Lambda Studio application here:
 
-Frontend: https://lambda-studio.netlify.app/
+Frontend: https://kmdev77.github.io/lambdastudio/
 
 ## Architecture
 
@@ -45,15 +45,14 @@ Each Lambda function runs in Node.js 18+, triggered via API Gateway POST routes,
 ## Project Structure
 
 ```
-lambda-studio/
+lambdastudio/
 ├── lambdas/
-│   ├── process/          # Resize images with Sharp
+│   ├── processImage/          # Resize images with Sharp
 │   ├── palette/          # Extract color palettes
-│   └── sign-upload/      # Generate presigned S3 URLs
+│   └── signUpload/      # Generate presigned S3 URLs
 │
 ├── frontend/             # React + Vite + Tailwind UI
 │   ├── src/
-│   │   ├── components/
 │   │   ├── assets/
 │   │   └── App.tsx
 │   └── public/
@@ -79,7 +78,7 @@ lambda-studio/
 ### Backend
 - AWS Lambda (Node.js 18)
 - Amazon S3
-- API Gateway v2
+- API Gateway 
 - Terraform
 - Sharp (image processing)
 - Hugging Face API (palette inference)
@@ -168,6 +167,77 @@ VITE_S3_BUCKET="image-resizer-bucket-10222025"
 5. Frontend displays uploaded, resized, and extracted results.
 
 
+
+
+# Debugging Log & Problem/Solution Highlights
+
+> Last updated: 2025-10-31  
+
+---
+
+## 1) CORS errors between frontend and backend
+**What happened:** My frontend couldn’t talk to the backend at all. Every request failed with “Failed to fetch.”  
+**Why:** The browser was blocking the requests because I didn’t have CORS set up correctly on API Gateway and S3.  
+**Fix:** I added the right headers and methods (`OPTIONS, POST, GET`) on both sides and redeployed. After that, everything worked.  
+**Lesson:** CORS issues aren’t about bad code — they’re about missing permissions between your frontend and backend.
+
+---
+
+## 2) API route duplication / drift between console and Terraform
+**What happened:** Some of my API routes started duplicating or behaving weirdly after updates.  
+**Why:** I had created a few routes manually in the AWS console while Terraform was also managing them. That caused Terraform and AWS to get out of sync.  
+**Fix:** I imported the existing routes into Terraform so it could fully manage them again:  
+```
+terraform import aws_apigatewayv2_route.process       <apiId>/<routeId for POST /process>
+terraform import aws_apigatewayv2_route.palette       <apiId>/<routeId for POST /palette>
+terraform import aws_apigatewayv2_route.sign          <apiId>/<routeId for POST /sign>
+terraform import aws_apigatewayv2_route.sign_upload   <apiId>/<routeId for POST /sign-upload>
+```
+**Lesson:** Don’t mix console changes with Terraform. Import them first so everything stays in sync.
+
+---
+
+## 3) Preview not updating after resize
+**What happened:** After resizing an image, the preview didn’t change even though the backend worked.  
+**Why:** My frontend was still showing the old cached image.  
+**Fix:** I updated the state with the new file key and added a cache-busting timestamp at the end of the image URL.  
+**Lesson:** Always update your frontend to use the new file URL after an operation.
+
+---
+
+
+## 4) Hugging Face model permission errors
+**What happened:** My background removal model suddenly stopped working.  
+**Why:** The provider I was using required paid access. My token didn’t have the right permissions.  
+**Fix:** I created a new token with proper scopes and switched to a free open-source model for color palette extraction.  
+**Lesson:** Always check model access and token permissions early.
+
+---
+
+
+## 5) Some S3 images worked, others gave errors
+**What happened:** Some images loaded fine while others failed with 403 errors.  
+**Why:** I was mixing public S3 links and presigned URLs in my frontend.  
+**Fix:** I standardized it — if a presigned URL exists, use that. Otherwise, build the public URL from the bucket name.  
+**Lesson:** Pick one URL method (public or presigned) and be consistent.
+
+---
+
+## 6) S3 file paths returning 404
+**What happened:** Some processed images came back as “file not found.”  
+**Why:** My backend and frontend were using slightly different environment variable names for bucket prefixes.  
+**Fix:** I standardized the names (`uploads/`, `thumbs/`) and made sure both sides built URLs the same way.  
+**Lesson:** Keep your environment variable names consistent across services.
+
+---
+
+## 7) API routes stopped working after edits
+**What happened:** A few endpoints stopped working after I changed some configurations.  
+**Why:** My `api.tf` file got messy from small tweaks and old code.  
+**Fix:** I rebuilt a clean version of the file, redefined all routes, and fixed CORS in one place.  
+**Lesson:** Sometimes it’s easier to rebuild clean infrastructure than keep patching old configs.
+
+---
 
 ## Author
 
