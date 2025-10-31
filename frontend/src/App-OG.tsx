@@ -7,13 +7,14 @@ import IntroExplainer from "./IntroExplainer"
 import thumbsLeft from "./assets/thumbs-left-2.png"; // adjust path if different
 import PaletteIcon from "./assets/palette-ls.png"
 import ResizeIcon from "./assets/resize-ls.png"
-import { Moon, Sun} from "lucide-react";
-
 
 import ThemeToggle from './ThemeToggle';
 
+
 const MAX_PX = 4096;
 type Fit = "contain" | "cover" | "fill" | "inside" | "outside";
+
+
 
 export default function App() {
   const [processOk, setProcessOk] = useState(false);
@@ -21,6 +22,8 @@ export default function App() {
   const [processedKey, setProcessedKey] = useState<string | null>(null); // thumbs/... (optional)
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultDownloadUrl, setResultDownloadUrl] = useState<string | null>(null);
+
+
 
   const apiUrl = import.meta.env.VITE_API_URL as string;
   const bucketEnv = (import.meta.env.VITE_S3_BUCKET as string) || "";
@@ -43,7 +46,6 @@ export default function App() {
   const ratio = useMemo(() => (imgMeta ? imgMeta.w / imgMeta.h : 1), [imgMeta]);
 
   const dropRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     const el = dropRef.current;
     if (!el) return;
@@ -59,45 +61,6 @@ export default function App() {
       ["dragenter", "dragover", "dragleave", "drop"].forEach(evt => el.removeEventListener(evt, prevent as any));
       el.removeEventListener("drop", onDrop as any);
     };
-  }, []);
-
-  // ===== THEME: default to LIGHT everywhere, with a user toggle next to GitHub =====
-  type Theme = "light" | "dark";
-  const [theme, setTheme] = useState<Theme>("light");
-
-  // Init theme (force light by default, respect a previous user choice)
-  useEffect(() => {
-    const stored = (typeof window !== "undefined" && localStorage.getItem("theme")) as Theme | null;
-    const initial: Theme = stored === "dark" ? "dark" : "light";
-    setTheme(initial);
-    const root = document.documentElement;
-    if (initial === "dark") root.classList.add("dark"); else root.classList.remove("dark");
-    // Ensure persistence so mobile/desktop both load the same
-    localStorage.setItem("theme", initial);
-  }, []);
-
-  const toggleTheme = () => {
-    setTheme((prev) => {
-      const next: Theme = prev === "dark" ? "light" : "dark";
-      const root = document.documentElement;
-      if (next === "dark") root.classList.add("dark"); else root.classList.remove("dark");
-      localStorage.setItem("theme", next);
-      return next;
-    });
-  };
-
-
-
-  // ================================================================================
-
-  // FIX: force a reflow on orientation/resize so measured layouts & CSS recalcs settle
-  const [, setViewport] = useState({ w: typeof window !== "undefined" ? window.innerWidth : 0, h: typeof window !== "undefined" ? window.innerHeight : 0 });
-  useEffect(() => {
-    const handle = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
-    window.addEventListener("resize", handle);
-    window.addEventListener("orientationchange", handle);
-    const t = setTimeout(handle, 60); // settle after chrome hides/shows bars
-    return () => { clearTimeout(t); window.removeEventListener("resize", handle); window.removeEventListener("orientationchange", handle); };
   }, []);
 
   async function handleFile(f: File) {
@@ -229,6 +192,7 @@ export default function App() {
     }
   }
 
+
   async function onPalette() {
     if (!uploadKey) {
       setNote("Palette error: no uploaded file key. Upload an image first.");
@@ -258,6 +222,7 @@ export default function App() {
       setProcessing(false);
     }
   }
+
 
   async function downloadResized() {
     if (!resultUrl && !resultDownloadUrl) return;
@@ -297,9 +262,20 @@ export default function App() {
     }
   }
 
+
+
+
+
   const clamp = (n: number) => Math.max(1, Math.min(MAX_PX, Math.round(n)));
   const onWidth = (n: number) => dims && setDims(dims.lock ? { ...dims, w: clamp(n), h: clamp(n / ratio) } : { ...dims, w: clamp(n) });
   const onHeight = (n: number) => dims && setDims(dims.lock ? { ...dims, h: clamp(n), w: clamp(n * ratio) } : { ...dims, h: clamp(n) });
+
+  // function scrollToInstructions() {
+  //   const nodes = Array.from(document.querySelectorAll('[data-hiw="true"]')) as HTMLElement[];
+  //   const target = nodes.find(n => getComputedStyle(n).display !== "none") || nodes[0];
+  //   if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  // }
+
 
   return (
     <div className="min-h-[100dvh] w-full overflow-x-hidden bg-gradient-to-b from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-black text-zinc-800 dark:text-zinc-100 flex flex-col">
@@ -315,24 +291,16 @@ export default function App() {
           </div>
 
           {/* Right actions */}
-          <div className="flex items-center gap-3">
-            {/* THEME TOGGLE — sits right next to the GitHub icon */}
-            <button
-              onClick={toggleTheme}
-              type="button"
-              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              className="h-8 w-8 rounded-md border border-zinc-300/70 dark:border-zinc-700/70 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
-            >
-              {theme === "dark" ? (
-                // Sun icon for dark -> light
-                    <Sun className="h-4 w-4" aria-hidden="true" />
-              ) : (
-                // Moon icon for light -> dark
-            <Moon className="h-4 w-4" aria-hidden="true" />
-              )}
-            </button>
+          <div className="flex items-center gap-4">
+            {/* <button
+        onClick={scrollToInstructions}
+        className="text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:text-emerald-500 transition"
+        aria-label="Scroll to instructions"
+      >
+        Instructions
+      </button> */}
 
+            {/* <ThemeToggle /> */}
             <a
               href="https://github.com/kmdev77/lambdastudio"
               target="_blank"
@@ -354,12 +322,14 @@ export default function App() {
         </div>
       </header>
 
+
+
       {/* MAIN: grid; left column flex stack */}
       <main className="pt-20 max-w-6xl w-full mx-auto px-4 py-8 grid lg:grid-cols-12 gap-8 items-stretch">
         {/* LEFT COLUMN */}
         <div className="lg:col-span-5 flex flex-col gap-6 h-full">
-          <IntroExplainer />
 
+          <IntroExplainer />
           {/* Upload */}
           <div
             ref={dropRef}
@@ -402,6 +372,7 @@ export default function App() {
             <p className="font-medium mb-4 text-sm">Resize Options</p>
 
             <div className="w-full">
+
               {/* Mobile / small tablet: stacked inputs + centered lock */}
               <div className="md:hidden space-y-3">
                 {/* Width */}
@@ -477,9 +448,22 @@ export default function App() {
                   />
                 </div>
               </div>
+
             </div>
 
+
             {/* Process */}
+            {/* <button
+              onClick={onProcess}
+              disabled={!key || processing}
+              className="mt-6 relative w-full h-12 rounded-xl bg-black text-white dark:bg-white dark:text-black disabled:opacity-50 overflow-hidden group"
+            >
+              <span className="relative z-10">
+                {processing ? "Processing…" : "Resize Image"}
+              </span>
+              <span className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity blur-lg"></span>
+            </button> */}
+
             <button
               onClick={onProcess}
               disabled={!key || processing}
@@ -493,39 +477,33 @@ export default function App() {
                 />
                 <span>{processing ? "Processing…" : "Resize Image"}</span>
               </span>
+
               <span className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-blue-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity blur-lg"></span>
             </button>
 
+
             {/* Palette */}
-            {/* FIX: contain the conic-gradient border so it can't overflow horizontally */}
-           {/* Palette (brand gradient ring, subtle fill on hover) */}
-<div className="mt-4 group rounded-xl p-[2px]
-            bg-gradient-to-r from-emerald-500/60 via-sky-500/60 to-indigo-600/60
-            dark:from-emerald-400/45 dark:via-teal-500/45 dark:to-indigo-500/45">
-  <button
-    onClick={onPalette}
-    disabled={!key || uploading}
-    className="relative w-full h-12 rounded-[10px]
-               bg-white/90 dark:bg-zinc-900/90 backdrop-blur
-               text-zinc-900 dark:text-zinc-100
-               flex items-center justify-center gap-2
-               transition-[transform,box-shadow] duration-150
-               hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 overflow-hidden"
-  >
-    {/* hover fill that echoes the brand ring */}
-    <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity
-                     bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-600
-                     dark:from-emerald-400 dark:via-teal-500 dark:to-indigo-500" />
-    <span className="relative z-10 flex items-center gap-2">
-      <img src={PaletteIcon} alt="Palette" className="w-5 h-auto object-contain" />
-      <span>Get Palette</span>
-    </span>
-  </button>
-</div>
+            <div className="mt-4 relative">
+              <div className="absolute inset-0 rounded-xl p-[2px] bg-[conic-gradient(from_0deg,red,orange,yellow,green,cyan,blue,purple,red)]">
+                <div className="h-full w-full bg-white dark:bg-zinc-900 rounded-[10px]"></div>
+              </div>
+              <button
+                onClick={onPalette}
+                disabled={!key || uploading}
+                className="relative z-10 w-full h-12 font-medium text-lg rounded-xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur hover:scale-[1.01] active:scale-[0.99] transition-transform flex items-center justify-center gap-2"
+              >
+                <img
+                  src={PaletteIcon}
+                  alt="Palette"
+                  className="w-5 h-auto object-contain"
+                />
+                <span>Get Palette</span>
+              </button>
+            </div>
 
             {/* Status row (under the buttons) */}
             <div className="mt-2 flex items-center text-md text-zinc-600 dark:text-zinc-400">
-              {!processing && processOk && (
+                  {!processing && processOk && (
                 <img
                   src={thumbsLeft}
                   alt="success"
@@ -534,8 +512,15 @@ export default function App() {
                 />
               )}
               <span className="truncate">{note}</span>
+          
             </div>
+
           </div>
+
+          {/* INTRO CARD — desktop snug filler */}
+          {/* INTRO CARD — desktop snug filler */}
+
+
         </div>
 
         {/* RIGHT COLUMN */}
@@ -607,6 +592,28 @@ export default function App() {
           )}
         </section>
       </main>
+
+      {/* MOBILE-ONLY How It Works (placed RIGHT BEFORE FOOTER) */}
+
+
+
+      {/* FOOTER aligned to content edges */}
+      {/* <footer className="border-t border-zinc-200/60 dark:border-zinc-800/60 py-6">
+        <div className="relative max-w-6xl mx-auto px-4">
+          <span className="pointer-events-none absolute -top-[1px] left-0 right-0 h-[2px] bg-gradient-to-r from-pink-500 via-emerald-400 to-cyan-500 animate-[rainbow_4s_linear_infinite]" />
+          <div className="flex flex-col md:flex-row items-center justify-between text-sm text-zinc-500 dark:text-zinc-400">
+            <div className="flex items-center mb-4 md:mb-0">
+              <img src={Logo} alt="Lambda Studio" className="w-7 h-7 mr-2 select-none" />
+              <span className="font-semibold tracking-wide">Lambda Studio</span>
+            </div>
+            <div className="flex space-x-6 text-zinc-600 dark:text-zinc-400">
+              <a href="https://lambda-studio-docs.example.com" className="hover:text-emerald-500 transition" target="_blank" rel="noopener noreferrer">Docs</a>
+              <a href="https://github.com/yourusername/lambda-studio" className="hover:text-emerald-500 transition" target="_blank" rel="noopener noreferrer">GitHub</a>
+              <a href="#about" className="hover:text-emerald-500 transition">About</a>
+            </div>
+          </div>
+        </div>
+      </footer> */}
 
       <style>{`
 @keyframes rainbow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }

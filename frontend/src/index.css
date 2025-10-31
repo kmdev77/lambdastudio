@@ -1,3 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
 /* Plain CSS for now; Tailwind comes from CDN during dev */
 @font-face {
   font-family: 'Satoshi-Black';
@@ -8,15 +13,30 @@
   font-style: normal;
 }
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 
-html, body {
+html, body, #root {
+   max-width: 100%;
+  overflow-x: hidden;         /* kill horizontal creep */
+  height: 100%;
   background: #fafafa;
   color: #0a0a0a;
   margin: 0;
   /* font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; */
 font-family: 'Satoshi-Black'!important;
+}
+
+/* Smooth theme switch fade (respects reduced motion) */
+@media (prefers-reduced-motion: no-preference) {
+  .theme-xfade,
+  .theme-xfade * {
+    transition:
+      background-color 200ms ease,
+      color 200ms ease,
+      border-color 200ms ease,
+      fill 200ms ease,
+      stroke 200ms ease,
+      box-shadow 200ms ease,
+      outline-color 200ms ease;
+  }
 }
