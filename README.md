@@ -115,7 +115,9 @@ All routes are deployed under a single API Gateway instance and are CORS-enabled
 - HTTPS enforced for all API calls.
 - IAM role grants least-privilege Lambda and S3 permissions.
 
-## Deployment
+### GitHub Pages Setup (Frontend)
+
+The frontend is deployed automatically through **GitHub Actions → GitHub Pages**.
 
 ### Terraform Setup
 
@@ -151,7 +153,7 @@ npm run build
 npm run preview
 ```
 
-Deploy via Netlify, Vercel, or S3 + CloudFront using:
+Deploy using:
 
 ```env
 VITE_API_URL="https://1zsjireqq3.execute-api.us-west-1.amazonaws.com/prod"
